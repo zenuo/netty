@@ -39,19 +39,22 @@ public class XmlDecoder extends ByteToMessageDecoder {
     private static final XmlDocumentEnd XML_DOCUMENT_END = XmlDocumentEnd.INSTANCE;
 
     private final AsyncXMLStreamReader<AsyncByteArrayFeeder> streamReader = XML_INPUT_FACTORY.createAsyncForByteArray();
-    private final AsyncByteArrayFeeder streamFeeder = (AsyncByteArrayFeeder) streamReader.getInputFeeder();
+    private final AsyncByteArrayFeeder streamFeeder = streamReader.getInputFeeder();
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
         byte[] buffer = new byte[in.readableBytes()];
         in.readBytes(buffer);
         try {
+            //输入
             streamFeeder.feedInput(buffer, 0, buffer.length);
         } catch (XMLStreamException exception) {
+            //若报错则跳过缓冲区内的字节，并且抛出异常
             in.skipBytes(in.readableBytes());
             throw exception;
         }
 
+        //若不需要更多输入
         while (!streamFeeder.needMoreInput()) {
             int type = streamReader.next();
             switch (type) {
