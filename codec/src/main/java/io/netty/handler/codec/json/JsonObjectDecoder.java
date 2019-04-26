@@ -42,6 +42,9 @@ import java.util.List;
  */
 public class JsonObjectDecoder extends ByteToMessageDecoder {
 
+    /**
+     * 状态集
+     */
     private static final int ST_CORRUPTED = -1;
     private static final int ST_INIT = 0;
     private static final int ST_DECODING_NORMAL = 1;
@@ -90,12 +93,14 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        //若状态为被腐蚀的，忽略缓冲区内的字节数组
         if (state == ST_CORRUPTED) {
             in.skipBytes(in.readableBytes());
             return;
         }
 
         if (this.idx > in.readerIndex() && lastReaderIndex != in.readerIndex()) {
+            //同步
             this.idx = in.readerIndex() + (idx - lastReaderIndex);
         }
 
@@ -194,8 +199,10 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
 
     private void decodeByte(byte c, ByteBuf in, int idx) {
         if ((c == '{' || c == '[') && !insideString) {
+            //若为{或[，且不在字符串内，增加打开的括号计数
             openBraces++;
         } else if ((c == '}' || c == ']') && !insideString) {
+            //若为}或]，且不在字符串内，减少打开的括号计数
             openBraces--;
         } else if (c == '"') {
             // start of a new JSON string. It's necessary to detect strings as they may
@@ -214,16 +221,24 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
                     }
                 }
                 // The double quote isn't escaped only if there are even "\"s.
+                // 当且仅当有偶数个反斜线时，双引号未转义
                 if (backslashCount % 2 == 0) {
                     // Since the double quote isn't escaped then this is the end of a string.
+                    // 由于双引号未转义，因此这是字符串的结尾。
                     insideString = false;
                 }
             }
         }
     }
 
+    /**
+     * 初始化解码
+     *
+     * @param openingBrace 打开括号的字节
+     */
     private void initDecoding(byte openingBrace) {
         openBraces = 1;
+        //修改状态
         if (openingBrace == '[' && streamArrayElements) {
             state = ST_DECODING_ARRAY_STREAM;
         } else {
